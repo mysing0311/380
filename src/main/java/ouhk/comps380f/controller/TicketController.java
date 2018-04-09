@@ -1,9 +1,11 @@
 package ouhk.comps380f.controller;
 
 import java.io.IOException;
+import java.security.Principal;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
+import javax.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,18 +39,9 @@ public class TicketController {
 
     public static class Form {
 
-        private String customerName;
         private String subject;
         private String body;
         private List<MultipartFile> attachments;
-
-        public String getCustomerName() {
-            return customerName;
-        }
-
-        public void setCustomerName(String customerName) {
-            this.customerName = customerName;
-        }
 
         public String getSubject() {
             return subject;
@@ -77,10 +70,10 @@ public class TicketController {
     }
 
     @RequestMapping(value = "create", method = RequestMethod.POST)
-    public View create(Form form) throws IOException {
+    public View create(Form form, Principal principal) throws IOException {
         Ticket ticket = new Ticket();
         ticket.setId(this.getNextTicketId());
-        ticket.setCustomerName(form.getCustomerName());
+        ticket.setCustomerName(principal.getName());
         ticket.setSubject(form.getSubject());
         ticket.setBody(form.getBody());
 
@@ -147,9 +140,11 @@ public class TicketController {
     }
 
     @RequestMapping(value = "edit/{ticketId}", method = RequestMethod.GET)
-    public ModelAndView showEdit(@PathVariable("ticketId") long ticketId) {
+    public ModelAndView showEdit(@PathVariable("ticketId") long ticketId, Principal principal, HttpServletRequest request) {
         Ticket ticket = this.ticketDatabase.get(ticketId);
-        if (ticket == null) {
+        if (ticket == null
+                || (!request.isUserInRole("ROLE_ADMIN")
+                && !principal.getName().equals(ticket.getCustomerName()))) {
             return new ModelAndView(new RedirectView("/ticket/list", true));
         }
         ModelAndView modelAndView = new ModelAndView("edit");
@@ -157,7 +152,6 @@ public class TicketController {
         modelAndView.addObject("ticket", ticket);
 
         Form ticketForm = new Form();
-        ticketForm.setCustomerName(ticket.getCustomerName());
         ticketForm.setSubject(ticket.getSubject());
         ticketForm.setBody(ticket.getBody());
         modelAndView.addObject("ticketForm", ticketForm);
@@ -166,10 +160,16 @@ public class TicketController {
     }
 
     @RequestMapping(value = "edit/{ticketId}", method = RequestMethod.POST)
-    public String edit(@PathVariable("ticketId") long ticketId, Form form)
+    public String edit(@PathVariable("ticketId") long ticketId, Form form,
+            Principal principal, HttpServletRequest request)
             throws IOException {
+
         Ticket ticket = this.ticketDatabase.get(ticketId);
-        ticket.setCustomerName(form.getCustomerName());
+        if (ticket == null
+                || (!request.isUserInRole("ROLE_ADMIN")
+                && !principal.getName().equals(ticket.getCustomerName()))) {
+            return "redirect:/ticket/list";
+        }
         ticket.setSubject(form.getSubject());
         ticket.setBody(form.getBody());
 
